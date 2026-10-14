@@ -94,8 +94,15 @@ struct ContentView: View {
             }
         }
         .task {
-            // Re-open the last used model on launch
-            vm.restoreLastDocument()
+            OpenRouter.shared.activeViewModel = vm
+            // Consume a URL queued by the Finder before this window existed
+            if let pending = OpenRouter.shared.pendingURL {
+                OpenRouter.shared.pendingURL = nil
+                vm.open(url: pending)
+            } else {
+                // Re-open the last used model on launch
+                vm.restoreLastDocument()
+            }
         }
     }
 
@@ -143,9 +150,9 @@ struct ContentView: View {
                 }
                 .help("缩放适配 (⌘0)")
 
-                // Compare versions
+                // Compare any two versions
                 if vm.versions.count > 1 {
-                    compareMenu(vm: vm)
+                    CompareButton(vm: vm)
                 }
 
                 // Export
@@ -195,35 +202,82 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
-    private func compareMenu(vm: GraphViewModel) -> some View {
-        Menu {
-            Button {
-                vm.setCompareVersion(nil)
-            } label: {
-                HStack {
-                    Text("关闭对比")
-                    if !vm.isDiffMode { Image(systemName: "checkmark") }
-                }
-            }
-            Divider()
-            ForEach(vm.versions) { version in
-                if version != vm.currentVersion {
-                    Button {
-                        vm.setCompareVersion(version)
-                    } label: {
-                        HStack {
-                            Text("\(version.name) → 当前")
-                            if vm.compareVersion == version { Image(systemName: "checkmark") }
-                        }
-                    }
-                }
-            }
+}
+
+// MARK: - Compare popover (pick any two versions)
+
+struct CompareButton: View {
+    @Bindable var vm: GraphViewModel
+    @State private var showPopover = false
+
+    var body: some View {
+        Button {
+            showPopover.toggle()
         } label: {
             Label("对比", systemImage: vm.isDiffMode ? "rectangle.difference" : "rectangle.on.rectangle.angled")
                 .foregroundStyle(vm.isDiffMode ? Color.orange : Color.primary)
         }
-        .help("与历史版本对比（绿色=新增，红色=删除，橙色=修改）")
+        .help("任意两个版本 Diff 对比（绿=新增，红=删除，橙=修改）")
+        .popover(isPresented: $showPopover, arrowEdge: .bottom) {
+            ComparePanel(vm: vm)
+        }
+    }
+}
+
+struct ComparePanel: View {
+    @Bindable var vm: GraphViewModel
+    @State private var oldSel: ModelVersion?
+    @State private var newSel: ModelVersion?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("版本对比")
+                .font(.system(size: 13, weight: .semibold))
+
+            Picker("旧版本", selection: $oldSel) {
+                Text("—").tag(ModelVersion?.none)
+                ForEach(vm.versions) { v in
+                    Text(v.name).tag(ModelVersion?.some(v))
+                }
+            }
+            .pickerStyle(.menu)
+
+            Picker("新版本", selection: $newSel) {
+                Text("—").tag(ModelVersion?.none)
+                ForEach(vm.versions) { v in
+                    Text(v.name).tag(ModelVersion?.some(v))
+                }
+            }
+            .pickerStyle(.menu)
+
+            if let d = vm.diff {
+                Text("\(d.oldVersionName) → \(d.newVersionName)：\(d.summary)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            HStack(spacing: 8) {
+                Button("应用对比") {
+                    vm.setCompare(old: oldSel, new: newSel)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(oldSel == nil || newSel == nil || oldSel == newSel)
+
+                Button("关闭对比") {
+                    vm.clearCompare()
+                }
+                .disabled(!vm.isDiffMode)
+
+                Spacer()
+            }
+        }
+        .padding(14)
+        .frame(width: 280)
+        .onAppear {
+            oldSel = vm.compareOld
+            newSel = vm.compareNew ?? vm.currentVersion
+        }
     }
 }
 

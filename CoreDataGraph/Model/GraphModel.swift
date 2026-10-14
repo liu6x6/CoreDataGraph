@@ -173,11 +173,12 @@ enum NodeMetrics {
     }
 
     /// Xcode-style: everything expanded by default; `collapsed` set limits rows.
-    static func size(for node: EntityNode, collapsed: Bool) -> CGSize {
+    /// `extraRelRows` = additional rows (e.g. deleted-relationship ghost rows in diff mode).
+    static func size(for node: EntityNode, collapsed: Bool, extraRelRows: Int = 0) -> CGSize {
         let attrTotal = node.attributes.count
         let relTotal = node.relationships.count
         let attrRows = collapsed ? min(attrTotal, collapsedAttrRows) : attrTotal
-        let relRows = collapsed ? min(relTotal, collapsedRelRows) : relTotal
+        let relRows = (collapsed ? min(relTotal, collapsedRelRows) : relTotal) + (collapsed ? 0 : extraRelRows)
 
         var h: CGFloat = headerHeight
         if attrRows > 0 {

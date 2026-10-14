@@ -44,9 +44,17 @@ final class GraphViewModel {
 
     // MARK: Diff state
 
-    var compareVersion: ModelVersion?
+    var compareOld: ModelVersion?
+    var compareNew: ModelVersion?
     var diff: ModelDiff?
-    var isDiffMode: Bool { compareVersion != nil }
+    /// Row-level status: entity → attribute name → status
+    var diffAttrStatus: [String: [String: DiffStatus]] = [:]
+    /// Row-level status: entity → relationship name → status
+    var diffRelStatus: [String: [String: DiffStatus]] = [:]
+
+    var isDiffMode: Bool {
+        compareOld != nil && compareNew != nil && compareOld != compareNew
+    }
 
     // MARK: Auto refresh
 
@@ -73,10 +81,13 @@ final class GraphViewModel {
 
             document = doc
             loadError = nil
+            compareOld = nil
+            compareNew = nil
+            diff = nil
+            diffAttrStatus = [:]
+            diffRelStatus = [:]
             RecentFilesStore.shared.add(url)
             RecentFilesStore.shared.markLastOpened(url)
-            compareVersion = nil
-            diff = nil
             selectedEntity = nil
             searchText = ""
             rebuildGraph()
@@ -98,8 +109,11 @@ final class GraphViewModel {
             doc.document = parsed
             doc.currentVersion = version
             document = doc
-            compareVersion = nil
+            compareOld = nil
+            compareNew = nil
             diff = nil
+            diffAttrStatus = [:]
+            diffRelStatus = [:]
             rebuildGraph()
             statusMessage = "已切换到 \(version.name)"
         } catch {
@@ -107,32 +121,58 @@ final class GraphViewModel {
         }
     }
 
-    // MARK: - Diff
+    // MARK: - Diff (any two versions)
 
-    func setCompareVersion(_ version: ModelVersion?) {
-        guard let base = document, let version else {
-            compareVersion = nil
+    func setCompare(old: ModelVersion?, new: ModelVersion?) {
+        compareOld = old
+        compareNew = new
+        if isDiffMode, let o = compareOld, let n = compareNew {
+            do {
+                let oldDoc = try ModelLoader.parseVersion(o)
+                let newDoc = try ModelLoader.parseVersion(n)
+                diff = ModelDiffer.diff(old: oldDoc, oldName: o.name,
+                                        new: newDoc, newName: n.name)
+                buildDiffLookups()
+                statusMessage = "对比 \(o.name) → \(n.name): \(diff?.summary ?? "")"
+            } catch {
+                loadError = error.localizedDescription
+                diff = nil
+                diffAttrStatus = [:]
+                diffRelStatus = [:]
+            }
+        } else {
             diff = nil
-            rebuildGraph()
-            return
+            diffAttrStatus = [:]
+            diffRelStatus = [:]
         }
-        guard let baseVersion = base.currentVersion, version != baseVersion else {
-            compareVersion = nil
-            diff = nil
-            rebuildGraph()
-            return
+        rebuildGraph()
+    }
+
+    func clearCompare() {
+        setCompare(old: nil, new: nil)
+    }
+
+    private func buildDiffLookups() {
+        var a: [String: [String: DiffStatus]] = [:]
+        var r: [String: [String: DiffStatus]] = [:]
+        for c in diff?.changedEntities ?? [] {
+            for x in c.addedAttributes { a[c.name, default: [:]][x.name] = .added }
+            for x in c.removedAttributes { a[c.name, default: [:]][x.name] = .removed }
+            for x in c.changedAttributes { a[c.name, default: [:]][x.name] = .changed }
+            for x in c.addedRelationships { r[c.name, default: [:]][x.name] = .added }
+            for x in c.removedRelationships { r[c.name, default: [:]][x.name] = .removed }
+            for x in c.changedRelationships { r[c.name, default: [:]][x.name] = .changed }
         }
-        do {
-            // old = compareVersion, new = current
-            let oldDoc = try ModelLoader.parseVersion(version)
-            diff = ModelDiffer.diff(old: oldDoc, oldName: version.name,
-                                    new: base.document, newName: baseVersion.name)
-            compareVersion = version
-            rebuildGraph()
-            statusMessage = "对比 \(version.name) → \(baseVersion.name): \(diff?.summary ?? "")"
-        } catch {
-            loadError = error.localizedDescription
-        }
+        diffAttrStatus = a
+        diffRelStatus = r
+    }
+
+    /// Relationships deleted in the new version — shown as red strikethrough rows
+    func removedRelationshipNames(of entityName: String) -> [String] {
+        guard isDiffMode else { return [] }
+        return (diffRelStatus[entityName] ?? [:])
+            .filter { $0.value == .removed }
+            .keys.sorted()
     }
 
     // MARK: - Graph building
@@ -140,47 +180,87 @@ final class GraphViewModel {
     func rebuildGraph() {
         guard let doc = document else { nodes = []; edges = []; return }
 
-        var built = doc.document.entities
+        var built: [EntityNode]
+        var builtEdges: [RelationshipEdge] = []
 
-        // Apply diff statuses + add removed entities as ghosts
-        if isDiffMode, let diff {
+        if isDiffMode, let oldV = compareOld, let newV = compareNew,
+           let diff,
+           let oldDoc = try? ModelLoader.parseVersion(oldV),
+           let newDoc = try? ModelLoader.parseVersion(newV) {
+
+            // Display the NEW version, colored against the OLD one
+            built = newDoc.entities
             for i in built.indices {
                 built[i].diffStatus = ModelDiffer.entityStatus(built[i].name, in: diff)
             }
-            let oldNames = Set(diff.removedEntities)
-            if !oldNames.isEmpty, let compare = compareVersion,
-               let oldDoc = try? ModelLoader.parseVersion(compare) {
-                for old in oldDoc.entities where oldNames.contains(old.name) {
-                    var ghost = old
-                    ghost.diffStatus = .removed
-                    built.append(ghost)
+            // Ghost cards for removed entities
+            let removedSet = Set(diff.removedEntities)
+            for old in oldDoc.entities where removedSet.contains(old.name) {
+                var ghost = old
+                ghost.diffStatus = .removed
+                built.append(ghost)
+            }
+
+            let nameSet = Set(built.map(\.name))
+            // Edges of surviving entities, with row-level diff status
+            for node in built where node.diffStatus != .removed {
+                for rel in node.relationships {
+                    guard nameSet.contains(rel.destinationEntity) else { continue }
+                    let status = diffRelStatus[node.name]?[rel.name] ?? .none
+                    builtEdges.append(RelationshipEdge(name: rel.name,
+                                                       fromEntity: node.name,
+                                                       toEntity: rel.destinationEntity,
+                                                       info: rel,
+                                                       diffStatus: status))
+                }
+            }
+            // Ghost edges: relationships owned by removed entities
+            for node in built where node.diffStatus == .removed {
+                for rel in node.relationships {
+                    guard nameSet.contains(rel.destinationEntity) else { continue }
+                    builtEdges.append(RelationshipEdge(name: rel.name,
+                                                       fromEntity: node.name,
+                                                       toEntity: rel.destinationEntity,
+                                                       info: rel,
+                                                       diffStatus: .removed))
+                }
+            }
+            // Ghost edges: relationships deleted from surviving entities
+            for (entityName, rels) in diffRelStatus {
+                for (relName, status) in rels where status == .removed {
+                    guard nameSet.contains(entityName),
+                          let oldRel = oldDoc.entities
+                              .first(where: { $0.name == entityName })?
+                              .relationships.first(where: { $0.name == relName }),
+                          nameSet.contains(oldRel.destinationEntity) else { continue }
+                    builtEdges.append(RelationshipEdge(name: relName,
+                                                       fromEntity: entityName,
+                                                       toEntity: oldRel.destinationEntity,
+                                                       info: oldRel,
+                                                       diffStatus: .removed))
                 }
             }
         } else {
+            built = doc.document.entities
             for i in built.indices { built[i].diffStatus = .none }
-        }
-
-        // Compute card sizes
-        for i in built.indices {
-            built[i].size = NodeMetrics.size(for: built[i], collapsed: collapsedEntities.contains(built[i].name))
-        }
-
-        // Build edges
-        let entityNames = Set(built.map(\.name))
-        var builtEdges: [RelationshipEdge] = []
-        for node in built {
-            for rel in node.relationships {
-                guard entityNames.contains(rel.destinationEntity) else { continue }
-                var status: DiffStatus = .none
-                if isDiffMode {
-                    status = node.diffStatus == .added || node.diffStatus == .removed ? node.diffStatus : .none
+            let nameSet = Set(built.map(\.name))
+            for node in built {
+                for rel in node.relationships {
+                    guard nameSet.contains(rel.destinationEntity) else { continue }
+                    builtEdges.append(RelationshipEdge(name: rel.name,
+                                                       fromEntity: node.name,
+                                                       toEntity: rel.destinationEntity,
+                                                       info: rel))
                 }
-                builtEdges.append(RelationshipEdge(name: rel.name,
-                                                   fromEntity: node.name,
-                                                   toEntity: rel.destinationEntity,
-                                                   info: rel,
-                                                   diffStatus: status))
             }
+        }
+
+        // Compute card sizes (extra red rows for deleted relationships in diff mode)
+        for i in built.indices {
+            let extra = removedRelationshipNames(of: built[i].name).count
+            built[i].size = NodeMetrics.size(for: built[i],
+                                             collapsed: collapsedEntities.contains(built[i].name),
+                                             extraRelRows: extra)
         }
 
         nodes = built
@@ -288,6 +368,7 @@ final class GraphViewModel {
     }
 
     func setLayoutMode(_ mode: LayoutMode) {
+        captureForUndo()
         layoutMode = mode
         if mode != .custom, let doc = document {
             // Explicit re-layout replaces the remembered custom arrangement
@@ -612,6 +693,53 @@ final class GraphViewModel {
     func reload() {
         guard let doc = document else { return }
         open(url: doc.rootURL)
+    }
+
+    // MARK: - Undo / Redo (position snapshots)
+
+    private var undoStack: [[String: CGPoint]] = []
+    private var redoStack: [[String: CGPoint]] = []
+
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+
+    func snapshotPositions() -> [String: CGPoint] {
+        Dictionary(uniqueKeysWithValues: nodes.map { ($0.name, $0.position) })
+    }
+
+    /// Call BEFORE a position-changing operation (drag start / re-layout).
+    func captureForUndo() {
+        undoStack.append(snapshotPositions())
+        if undoStack.count > 60 { undoStack.removeFirst() }
+        redoStack.removeAll()
+    }
+
+    func undo() {
+        guard let snap = undoStack.popLast() else {
+            statusMessage = "没有可撤销的操作"
+            return
+        }
+        redoStack.append(snapshotPositions())
+        applySnapshot(snap, message: "已撤销位置调整 (⌘Z)")
+    }
+
+    func redo() {
+        guard let snap = redoStack.popLast() else {
+            statusMessage = "没有可重做的操作"
+            return
+        }
+        undoStack.append(snapshotPositions())
+        applySnapshot(snap, message: "已重做 (⇧⌘Z)")
+    }
+
+    private func applySnapshot(_ snap: [String: CGPoint], message: String) {
+        for i in nodes.indices {
+            if let p = snap[nodes[i].name] {
+                nodes[i].position = p
+            }
+        }
+        savePositions()
+        statusMessage = message
     }
 
     // MARK: - Restore on launch

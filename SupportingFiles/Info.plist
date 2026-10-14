@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Core Data Model</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.apple.coredata.modelbundle</string>
+				<string>com.apple.coredata.model</string>
+				<string>com.apple.coredata.compiledmodel</string>
+				<string>com.apple.coredata.compiledmodelbundle</string>
+			</array>
+		</dict>
+	</array>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.directory</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Core Data Model Version Bundle</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.apple.coredata.modelbundle</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>xcdatamodeld</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.directory</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Core Data Model</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.apple.coredata.model</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>xcdatamodel</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Compiled Core Data Model</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.apple.coredata.compiledmodel</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>mom</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.directory</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Compiled Core Data Model Bundle</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.apple.coredata.compiledmodelbundle</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>momd</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+</dict>
+</plist>

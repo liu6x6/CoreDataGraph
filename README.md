@@ -5,7 +5,7 @@
 ![](https://img.shields.io/badge/platform-macOS%2014%2B-blue) ![](https://img.shields.io/badge/Swift-5-orange) ![](https://img.shields.io/badge/dependencies-none-brightgreen)
 
 ---
-
+![./Resource/screen.png](./Resource/screen.png)
 ## 为什么做这个
 
 新版 Xcode 打开 `.xcdatamodeld` 时不再显示实体关系图，只能逐个点 Entity 查看 Relationship。CoreDataGraph 直接解析模型文件，把完整的关系图画出来，并且比旧 Xcode 更强大：**版本 Diff、自定义排版记忆、导出 PNG/Mermaid/DOT、自动刷新**。
@@ -14,7 +14,7 @@
 
 ### 📂 通用模型加载
 - 支持打开 **任意** Core Data 模型：`.xcdatamodeld`（含多版本）、`.xcdatamodel`、`contents` XML、编译产物 `.mom` / `.momd`
-- 打开方式：⌘O 文件面板 / 拖拽进窗口 / 最近打开列表（安全作用域书签持久化）
+- 打开方式：⌘O 文件面板 / 拖拽进窗口 / 最近打开列表（安全作用域书签持久化）/ **Finder 双击 / 右键“打开方式” / `open -a`**（已注册文档类型）
 - 多窗口支持：可同时打开多个模型对比查看
 - **自动刷新**：监听模型文件，在 Xcode 里保存后画布自动更新（并保留你手动调整的布局）
 
@@ -44,13 +44,15 @@
 | 捏合 | 缩放（卡片、连线、标签整图等比缩放，任何缩放级别下不重叠）|
 | 双击卡片 | 展开 / 折叠完整属性 |
 | 双击左边栏实体 | **Fly-to 聚焦**：平滑飞行居中 + 自动放大 |
+| ⌘Z / ⇧⌘Z | **撤销 / 重做**卡片位置调整与重新布局 |
 | ⌘0 | 缩放适配全部内容 |
 | ⇧⌘L | 重新布局 |
 | 右键卡片 | 折叠/固定/复制名称/高亮关联 |
 
 ### 🔬 版本 Diff（Xcode 从来没有的能力）
-- 工具栏 Compare 选择任意历史版本与当前版本对比
-- 画布着色：🟢 新增实体、🔴 删除实体（幽灵卡片）、🟠 修改实体
+- 工具栏 Compare 弹出面板：**任意选择两个版本**对比（不限于“历史 → 当前”）
+- 画布着色：🟢 新增实体、🔴 删除实体（幽灵卡片 **含其红色关系连线**）、🟠 修改实体
+- **行级着色**：变更实体的卡片上，新增属性/关系标绿点、修改标橙、被删除的关系显示为红色删除线行
 - Inspector 列出属性/关系级别的完整变更明细（类型变化、Optional 变化、删除规则变化、inverse 变化…）
 - 检查 lightweight migration 是否遗漏的利器
 
@@ -113,7 +115,10 @@ CoreDataGraph/
     ├── Exporter.swift              # PNG / Mermaid / DOT 导出
     ├── PositionStore.swift         # 自定义排版持久化
     ├── RecentFilesStore.swift      # 最近文件（安全作用域书签）
+    ├── OpenRouter.swift            # Finder/AppleEvent 打开请求路由到活动窗口
     └── DirectoryWatcher.swift      # GCD 文件监听（自动刷新）
+
+SupportingFiles/Info.plist          # 文档类型注册（CFBundleDocumentTypes + UTImportedTypeDeclarations）
 ```
 
 ## 技术要点
@@ -126,11 +131,12 @@ CoreDataGraph/
 
 ## Roadmap / Ideas
 
-- [ ] 注册 `.xcdatamodeld` 文档类型，支持 Finder "打开方式"
 - [ ] 继承关系（parentEntity）用空心三角箭头单独表达
-- [ ] 布局导出/导入（JSON），团队共享排版
-- [ ] 大模型分区导航（minimap）
-- [ ] Entity 代码生成快照对比
+- [ ] 大模型性能优化（Barnes-Hut 近似 / minimap）
+- [ ] 布局 JSON 导入/导出，团队共享排版
+- [ ] 导出 SVG
+- [ ] 单元测试 target
+- [ ] 本地化（en）
 
 ## License
 

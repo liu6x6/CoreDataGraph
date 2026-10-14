@@ -112,6 +112,7 @@ struct GraphCanvasView: View {
                 vm.zoomToFit(size: size)
             }
             .onReceive(NotificationCenter.default.publisher(for: .relayoutNotification)) { _ in
+                vm.captureForUndo()
                 vm.applyLayout()
                 vm.needsZoomToFit = true
             }
@@ -208,6 +209,7 @@ struct GraphCanvasView: View {
             .onChanged { g in
                 if dragOriginals[node.name] == nil {
                     dragOriginals[node.name] = node.position
+                    vm.captureForUndo()   // snapshot before this drag mutates positions
                     // If this card belongs to a multi-selection, move the whole group
                     if vm.groupSelection.contains(node.name) && vm.groupSelection.count > 1 {
                         var originals: [String: CGPoint] = [:]

@@ -26,7 +26,10 @@ struct EntityNodeView: View {
         vm.selectedEntity == node.name || vm.groupSelection.contains(node.name)
     }
     private var isDimmed: Bool { vm.isNodeDimmed(node) }
-    private var size: CGSize { NodeMetrics.size(for: node, collapsed: collapsed) }
+    private var size: CGSize {
+        NodeMetrics.size(for: node, collapsed: collapsed,
+                         extraRelRows: vm.removedRelationshipNames(of: node.name).count)
+    }
     private var settings: AppSettings { AppSettings.shared }
     @State private var isHovering = false
 
@@ -152,9 +155,14 @@ struct EntityNodeView: View {
         return VStack(spacing: 0) {
             ForEach(shown) { attr in
                 HStack(spacing: 4) {
+                    if let st = vm.diffAttrStatus[node.name]?[attr.name], st != .none {
+                        Circle()
+                            .fill(st == .added ? Color.green : Color.orange)
+                            .frame(width: 5, height: 5)
+                    }
                     Text(attr.name)
                         .font(.system(size: NodeMetrics.font(12)))
-                        .foregroundStyle(.primary.opacity(attr.isOptional ? 0.85 : 1.0))
+                        .foregroundStyle(rowColor(attr))
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer(minLength: 2)
@@ -215,6 +223,26 @@ struct EntityNodeView: View {
             if collapsed && node.relationships.count > NodeMetrics.collapsedRelRows {
                 moreLabel("+\(node.relationships.count - NodeMetrics.collapsedRelRows)")
             }
+            // Diff mode: deleted relationships shown as red strikethrough rows
+            if !collapsed {
+                ForEach(vm.removedRelationshipNames(of: node.name), id: \.self) { name in
+                    HStack(spacing: 3) {
+                        Image(systemName: "minus.circle")
+                            .font(.system(size: NodeMetrics.font(8)))
+                            .foregroundStyle(.red.opacity(0.8))
+                        Text(name)
+                            .font(.system(size: NodeMetrics.font(12)))
+                            .strikethrough()
+                            .foregroundStyle(.red.opacity(0.85))
+                            .lineLimit(1)
+                        Spacer(minLength: 1)
+                        Text("已删除")
+                            .font(.system(size: NodeMetrics.font(9)))
+                            .foregroundStyle(.red.opacity(0.7))
+                    }
+                    .frame(height: NodeMetrics.rowHeight)
+                }
+            }
         }
         .padding(.horizontal, 7)
         .padding(.vertical, NodeMetrics.sectionPad)
@@ -233,6 +261,15 @@ struct EntityNodeView: View {
             return cls.count > 14 ? String(cls.prefix(13)) + "…" : cls
         }
         return attr.type
+    }
+
+    private func rowColor(_ attr: AttributeInfo) -> Color {
+        switch vm.diffAttrStatus[node.name]?[attr.name] {
+        case .some(.added): return .green
+        case .some(.changed): return .orange
+        case .some(.removed): return .red
+        case .some(.none), .none: return .primary.opacity(attr.isOptional ? 0.85 : 1.0)
+        }
     }
 
     private func deletionColor(_ rule: String) -> Color {
