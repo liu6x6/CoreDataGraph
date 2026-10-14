@@ -128,6 +128,22 @@ struct ContentView: View {
                     Label("打开模型", systemImage: "folder.badge.plus")
                 }
                 .help("打开 .xcdatamodeld (⌘O)")
+
+                Button {
+                    vm.undo()
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                }
+                .disabled(!vm.canUndo)
+                .help("撤销位置调整 (⌘Z)")
+
+                Button {
+                    vm.redo()
+                } label: {
+                    Image(systemName: "arrow.uturn.forward")
+                }
+                .disabled(!vm.canRedo)
+                .help("重做 (⇧⌘Z)")
             }
 
             ToolbarItemGroup {
