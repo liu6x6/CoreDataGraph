@@ -23,6 +23,7 @@
 - 连线：**横平竖直的正交折线**（圆角拐弯），从卡片的具体"关系行"上引出
 - 一对关系（relationship + inverse）合并为**一条线**，两端分别标注关系名 / inverse 名
 - 基数可视化：to-one 单箭头、to-many 双箭头（箭头样式可配置：空心/实心/鸦爪/线条/无）
+- **继承关系**：parentEntity 用 UML 泛化记法单独表达——**空心三角箭头**指向父实体，与关系线区分
 - 点击实体 → 只高亮直接关联，其余变淡；关系行可点击跳转到目标实体
 
 ### 🧭 布局
@@ -58,11 +59,13 @@
 
 ### 📤 导出
 - **PNG**（2x 分辨率快照）
+- **SVG**（纯矢量：卡片/正交连线/箭头/标签/继承三角全部可无损缩放，遵循当前设置）
 - **Mermaid** `erDiagram`（可直接贴进 Markdown / GitHub / 语雀）
 - **Graphviz DOT**（record 节点 + 基数箭头，可 `dot -Tsvg` 二次处理）
 
 ### ⚙️ 设置（⌘,）
 - 卡片字体大小（80%–160%，卡片尺寸自动重算 + 防重叠）
+- 卡片宽度（150–400pt，独立于字体缩放）
 - 卡片是否显示属性类型
 - 连线粗细（0.5–4.0pt）
 - 箭头样式：`空心(Xcode)` / `实心` / `鸦爪` / `线条(→/⇒)` / `无`，带 1:1 / 1:N 实时预览
@@ -112,7 +115,8 @@ CoreDataGraph/
 │   └── SettingsView.swift          # 设置窗口
 └── Helpers/
     ├── AppSettings.swift           # 用户偏好（@Observable + UserDefaults）
-    ├── Exporter.swift              # PNG / Mermaid / DOT 导出
+    ├── Exporter.swift              # PNG / SVG / Mermaid / DOT 导出
+    ├── SVGExporter.swift           # 纯矢量 SVG 渲染器（复刻画布全部元素）
     ├── PositionStore.swift         # 自定义排版持久化
     ├── RecentFilesStore.swift      # 最近文件（安全作用域书签）
     ├── OpenRouter.swift            # Finder/AppleEvent 打开请求路由到活动窗口
@@ -131,10 +135,8 @@ SupportingFiles/Info.plist          # 文档类型注册（CFBundleDocumentTypes
 
 ## Roadmap / Ideas
 
-- [ ] 继承关系（parentEntity）用空心三角箭头单独表达
 - [ ] 大模型性能优化（Barnes-Hut 近似 / minimap）
 - [ ] 布局 JSON 导入/导出，团队共享排版
-- [ ] 导出 SVG
 - [ ] 单元测试 target
 - [ ] 本地化（en）
 

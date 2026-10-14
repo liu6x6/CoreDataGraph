@@ -23,6 +23,18 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                HStack {
+                    Text("卡片宽度")
+                        .frame(width: 90, alignment: .leading)
+                    Slider(value: $settings.cardWidth, in: 150...400, step: 5)
+                    Text("\(Int(settings.cardWidth)) pt")
+                        .font(.system(.body, design: .monospaced))
+                        .frame(width: 56, alignment: .trailing)
+                }
+                Text("最小 150pt；改变后自动重算布局防重叠")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Toggle("卡片上显示属性类型", isOn: $settings.showAttributeTypes)
             } header: {
                 Text("卡片")

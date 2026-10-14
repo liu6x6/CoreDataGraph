@@ -112,10 +112,6 @@ struct CoreDataGraphApp: App {
     }
 }
 
-extension Notification.Name {
-    static let openModelNotification = Notification.Name("CoreDataGraph.openModel")
-}
-
 // MARK: - File → Open Recent
 
 struct OpenRecentMenu: View {

@@ -70,6 +70,17 @@ final class AppSettings {
         }
     }
 
+    /// Card width in points (min 150).
+    var cardWidth: Double {
+        didSet {
+            let clamped = max(150, cardWidth)
+            if clamped != cardWidth { cardWidth = clamped; return }
+            defaults.set(cardWidth, forKey: Keys.cardWidth)
+            applyMetrics()
+            postChanged()
+        }
+    }
+
     /// Relationship line width in points.
     var edgeLineWidth: Double {
         didSet { defaults.set(edgeLineWidth, forKey: Keys.lineWidth) }
@@ -110,6 +121,7 @@ final class AppSettings {
 
     private enum Keys {
         static let fontScale = "settings.cardFontScale"
+        static let cardWidth = "settings.cardWidth"
         static let lineWidth = "settings.edgeLineWidth"
         static let arrowStyle = "settings.arrowStyle"
         static let showTypes = "settings.showAttributeTypes"
@@ -122,6 +134,7 @@ final class AppSettings {
     private init() {
         defaults.register(defaults: [
             Keys.fontScale: 1.0,
+            Keys.cardWidth: 218.0,
             Keys.lineWidth: 1.6,
             Keys.arrowStyle: ArrowStyle.hollow.rawValue,
             Keys.showTypes: true,
@@ -131,6 +144,7 @@ final class AppSettings {
             Keys.edgeColor: "#007AFF",
         ])
         cardFontScale = defaults.double(forKey: Keys.fontScale)
+        cardWidth = max(150, defaults.double(forKey: Keys.cardWidth))
         edgeLineWidth = defaults.double(forKey: Keys.lineWidth)
         let arrowRaw = defaults.string(forKey: Keys.arrowStyle) ?? ArrowStyle.hollow.rawValue
         arrowStyle = ArrowStyle(rawValue: arrowRaw) ?? .hollow
@@ -145,10 +159,12 @@ final class AppSettings {
     /// Push font scale into NodeMetrics so all sizing/layout picks it up.
     func applyMetrics() {
         NodeMetrics.scale = CGFloat(cardFontScale)
+        NodeMetrics.baseWidth = CGFloat(cardWidth)
     }
 
     func resetToDefaults() {
         cardFontScale = 1.0
+        cardWidth = 218
         edgeLineWidth = 1.6
         arrowStyle = .hollow
         showAttributeTypes = true

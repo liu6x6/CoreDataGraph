@@ -25,6 +25,7 @@ final class GraphViewModel {
 
     var nodes: [EntityNode] = []
     var edges: [RelationshipEdge] = []
+    var inheritanceLinks: [InheritanceLink] = []
 
     // MARK: UI state
 
@@ -265,6 +266,15 @@ final class GraphViewModel {
 
         nodes = built
         edges = builtEdges
+        // Inheritance (parentEntity) links, drawn separately with UML hollow triangles
+        let nameSet = Set(built.map(\.name))
+        var links: [InheritanceLink] = []
+        for n in built {
+            if let p = n.parentEntity, nameSet.contains(p) {
+                links.append(InheritanceLink(child: n.name, parent: p))
+            }
+        }
+        inheritanceLinks = links
         reindex()
         applyLayout(initial: true)
         needsZoomToFit = true

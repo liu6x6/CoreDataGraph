@@ -74,6 +74,7 @@ struct GraphCanvasView: View {
                         lineWidth: lw,
                         arrowStyle: arrow,
                         highlightColor: edgeHiColor,
+                        inheritance: vm.inheritanceLinks,
                         style: .init(showLabels: showEdgeLabels))
                 }
                 .allowsHitTesting(false)
@@ -264,4 +265,5 @@ struct DotGridBackground: View {
 extension Notification.Name {
     static let zoomToFitNotification = Notification.Name("CoreDataGraph.zoomToFit")
     static let relayoutNotification = Notification.Name("CoreDataGraph.relayout")
+    static let openModelNotification = Notification.Name("CoreDataGraph.openModel")
 }

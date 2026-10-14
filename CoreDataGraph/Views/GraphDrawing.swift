@@ -30,6 +30,7 @@ enum GraphDrawing {
                      lineWidth: CGFloat = 1.6,
                      arrowStyle: ArrowStyle = .hollow,
                      highlightColor: Color = .accentColor,
+                     inheritance: [InheritanceLink] = [],
                      transform: (CGPoint) -> CGPoint = { $0 },
                      style: Style = Style()) {
 
@@ -117,27 +118,12 @@ enum GraphDrawing {
                 continue
             }
 
-            // Ports: attach at the exact relationship row, exit left/right side
-            let toRight = c2.x >= c1.x
-            let offA = NodeMetrics.relRowOffset(in: a, relName: e.name, collapsed: colA)
-            let offB = NodeMetrics.relRowOffset(in: b, relName: e.info.inverseName ?? "", collapsed: colB)
-
-            let start = CGPoint(x: c1.x + (toRight ? sizeA.width / 2 + 1 : -(sizeA.width / 2 + 1)),
-                                y: c1.y + offA)
-            let end = CGPoint(x: c2.x + (toRight ? -(sizeB.width / 2 + 1) : sizeB.width / 2 + 1),
-                              y: c2.y + offB)
-
-            // Z route with rounded corners
-            let points: [CGPoint]
-            if abs(start.y - end.y) < 1 {
-                points = [start, end]
-            } else {
-                let midX = (start.x + end.x) / 2
-                points = [start,
-                          CGPoint(x: midX, y: start.y),
-                          CGPoint(x: midX, y: end.y),
-                          end]
-            }
+            // Ports + orthogonal Z route (shared with SVG export)
+            let routed = Self.route(edge: e, from: a, to: b, collapsed: collapsed, transform: transform)
+            let points = routed.points
+            let toRight = routed.toRight
+            let start = points[0]
+            let end = points[points.count - 1]
 
             let path = roundedPolyline(points, radius: 7)
             ctx.stroke(path, with: .color(color),
@@ -180,6 +166,74 @@ enum GraphDrawing {
                 }
             }
         }
+
+        // MARK: Inheritance links — UML generalization (hollow triangle at parent)
+        for link in inheritance {
+            guard let child = nodesByName[link.child], let parent = nodesByName[link.parent] else { continue }
+            let isHiLink = selectedEntity == link.child || selectedEntity == link.parent
+            let isDimLink = style.dimUnrelated && !isHiLink && (dimmed(child) || dimmed(parent))
+
+            var color = Color(nsColor: .secondaryLabelColor).opacity(0.85)
+            var width = max(lineWidth * 0.85, 0.8)
+            if isHiLink {
+                color = highlightColor
+                width = lineWidth + 0.6
+            }
+            if isDimLink { color = color.opacity(0.15) }
+
+            let pc = transform(parent.position)
+            let cc = transform(child.position)
+            let pSize = NodeMetrics.size(for: parent, collapsed: collapsed.contains(parent.name))
+            let cSize = NodeMetrics.size(for: child, collapsed: collapsed.contains(child.name))
+            let iStart = borderPoint(center: cc, size: cSize, toward: pc)
+            let iEnd = borderPoint(center: pc, size: pSize, toward: cc)
+
+            var path = Path()
+            path.move(to: iStart)
+            path.addLine(to: iEnd)
+            ctx.stroke(path, with: .color(color),
+                       style: StrokeStyle(lineWidth: width, lineCap: .round))
+
+            let angle = atan2(iEnd.y - iStart.y, iEnd.x - iStart.x)
+            drawOpenTriangle(ctx: ctx, tip: iEnd, angle: angle, size: 16, color: color,
+                             width: max(width, 1.1))
+        }
+    }
+
+    // MARK: - Routing (shared by canvas + SVG export)
+
+    struct Route {
+        var points: [CGPoint]
+        var toRight: Bool
+    }
+
+    static func route(edge: RelationshipEdge,
+                      from a: EntityNode,
+                      to b: EntityNode,
+                      collapsed: Set<String>,
+                      transform: (CGPoint) -> CGPoint = { $0 }) -> Route {
+        let colA = collapsed.contains(a.name)
+        let colB = collapsed.contains(b.name)
+        let sizeA = NodeMetrics.size(for: a, collapsed: colA)
+        let sizeB = NodeMetrics.size(for: b, collapsed: colB)
+        let c1 = transform(a.position)
+        let c2 = transform(b.position)
+        let toRight = c2.x >= c1.x
+        let offA = NodeMetrics.relRowOffset(in: a, relName: edge.name, collapsed: colA)
+        let offB = NodeMetrics.relRowOffset(in: b, relName: edge.info.inverseName ?? "", collapsed: colB)
+        let start = CGPoint(x: c1.x + (toRight ? sizeA.width / 2 + 1 : -(sizeA.width / 2 + 1)),
+                            y: c1.y + offA)
+        let end = CGPoint(x: c2.x + (toRight ? -(sizeB.width / 2 + 1) : sizeB.width / 2 + 1),
+                          y: c2.y + offB)
+        if abs(start.y - end.y) < 1 {
+            return Route(points: [start, end], toRight: toRight)
+        }
+        let midX = (start.x + end.x) / 2
+        return Route(points: [start,
+                              CGPoint(x: midX, y: start.y),
+                              CGPoint(x: midX, y: end.y),
+                              end],
+                     toRight: toRight)
     }
 
     // MARK: - Arrows
@@ -226,6 +280,23 @@ enum GraphDrawing {
                 drawChevron(ctx: ctx, tip: back, angle: angle, color: color, width: width)
             }
         }
+    }
+
+    /// UML generalization marker: large open (hollow) triangle
+    private static func drawOpenTriangle(ctx: GraphicsContext, tip: CGPoint,
+                                         angle: CGFloat, size: CGFloat,
+                                         color: Color, width: CGFloat) {
+        let half: CGFloat = 0.30
+        let p1 = CGPoint(x: tip.x - size * cos(angle - half), y: tip.y - size * sin(angle - half))
+        let p2 = CGPoint(x: tip.x - size * cos(angle + half), y: tip.y - size * sin(angle + half))
+        var path = Path()
+        path.move(to: tip)
+        path.addLine(to: p1)
+        path.addLine(to: p2)
+        path.closeSubpath()
+        ctx.fill(path, with: .color(Color(nsColor: .textBackgroundColor)))
+        ctx.stroke(path, with: .color(color),
+                   style: StrokeStyle(lineWidth: width, lineJoin: .round))
     }
 
     /// Open "→" style chevron: two strokes meeting at the tip

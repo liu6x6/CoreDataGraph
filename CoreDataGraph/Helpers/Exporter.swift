@@ -112,6 +112,19 @@ enum Exporter {
         }
     }
 
+    // MARK: - SVG
+
+    static func exportSVG(vm: GraphViewModel) {
+        guard !vm.nodes.isEmpty else { return }
+        guard let url = askSaveURL(name: "\(vm.modelName).svg", types: [.svg, .plainText]) else { return }
+        do {
+            try SVGExporter.string(vm: vm).write(to: url, atomically: true, encoding: .utf8)
+            vm.statusMessage = "已导出 SVG: \(url.lastPathComponent)"
+        } catch {
+            vm.statusMessage = "SVG 导出失败: \(error.localizedDescription)"
+        }
+    }
+
     private static func sanitize(_ s: String) -> String {
         s.replacingOccurrences(of: " ", with: "_")
          .replacingOccurrences(of: "-", with: "_")
@@ -140,6 +153,7 @@ struct SnapshotView: View {
                     lineWidth: CGFloat(settings.edgeLineWidth),
                     arrowStyle: settings.arrowStyle,
                     highlightColor: settings.selectedEdgeColor,
+                    inheritance: vm.inheritanceLinks,
                     transform: { p in CGPoint(x: p.x + shift.x, y: p.y + shift.y) },
                     style: .init(showLabels: settings.showEdgeLabels, dimUnrelated: false))
             }

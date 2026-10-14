@@ -174,6 +174,7 @@ struct ContentView: View {
                 // Export
                 Menu {
                     Button("导出 PNG…") { Exporter.exportPNG(vm: vm) }
+                    Button("导出 SVG…") { Exporter.exportSVG(vm: vm) }
                     Button("导出 Mermaid…") {
                         Exporter.exportText(Exporter.mermaid(vm: vm), vm: vm,
                                             ext: "mmd", type: .plainText, label: "Mermaid")

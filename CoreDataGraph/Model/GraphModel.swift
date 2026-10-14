@@ -97,6 +97,14 @@ struct EntityNode: Identifiable, Hashable {
     var diffStatus: DiffStatus = .none
 }
 
+// MARK: - Inheritance link (parentEntity)
+
+struct InheritanceLink: Identifiable, Hashable {
+    var id: String { "\(child)->\(parent)" }
+    var child: String
+    var parent: String
+}
+
 // MARK: - Edge (derived)
 
 struct RelationshipEdge: Identifiable, Hashable {
@@ -158,7 +166,10 @@ enum NodeMetrics {
     /// Global UI scale from AppSettings (Settings window). Applied at launch.
     static var scale: CGFloat = 1.0
 
-    static var width: CGFloat { 218 * scale }
+    /// Base card width from AppSettings (independent of font scale).
+    static var baseWidth: CGFloat = 218
+
+    static var width: CGFloat { baseWidth }
     static var headerHeight: CGFloat { 26 * scale }
     static var rowHeight: CGFloat { 16 * scale }
     static var sectionPad: CGFloat { 4 * scale }
